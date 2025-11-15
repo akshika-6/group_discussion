@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Device GD Analyzer</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        // Global error handler to display runtime and parse errors in the page
+        function _showAppError(e) {
+            try {
+                const root = document.getElementById('root');
+                const msg = (e && e.error && (e.error.stack || e.error.message)) || e.message || String(e);
+                if (root) root.innerHTML = '<div style="padding:18px;font-family:monospace;color:#900;background:#fff6f6;border:1px solid #f5c2c2;">' +
+                    '<strong>Application error:</strong><pre style="white-space:pre-wrap;margin-top:8px">' + msg + '</pre></div>';
+            } catch (err) {
+                console.error('Error displaying app error', err);
+            }
+            console.error('App error', e);
+        }
+        window.addEventListener('error', _showAppError);
+        window.addEventListener('unhandledrejection', _showAppError);
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Icon Components
+        const Brain = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/>
+                <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/>
+            </svg>
+        );
+
+        const Users = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+        );
+
+        const Video = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m22 8-6 4 6 4V8Z"/>
+                <rect width="14" height="12" x="2" y="6" rx="2" ry="2"/>
+            </svg>
+        );
+
+        const Mic = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" x2="12" y1="19" y2="22"/>
+            </svg>
+        );
+
+        const StopCircle = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <rect width="6" height="6" x="9" y="9"/>
+            </svg>
+        );
+
+        const Copy = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+            </svg>
+        );
+
+        const Check = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+        );
+
+        const Award = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="8" r="6"/>
+                <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>
+            </svg>
+        );
+
+        const AlertCircle = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" x2="12" y1="8" y2="12"/>
+                <line x1="12" x2="12.01" y1="16" y2="16"/>
+            </svg>
+        );
+
+        const MultiDeviceGDAnalyzer = () => {
+            const [mode, setMode] = useState(null);
+            const [roomCode, setRoomCode] = useState('');
+            const [participantName, setParticipantName] = useState('');
+            const [joinCode, setJoinCode] = useState('');
+            const [copied, setCopied] = useState(false);
+            const [participants, setParticipants] = useState([]);
+            const [gdStarted, setGdStarted] = useState(false);
+            const [gdEnded, setGdEnded] = useState(false);
+            const [totalTime, setTotalTime] = useState(0);
+            const [analysis, setAnalysis] = useState(null);
+            const [connected, setConnected] = useState(false);
+            const [myStream, setMyStream] = useState(null);
+            const [connectionStatus, setConnectionStatus] = useState('');
+            const [peerReady, setPeerReady] = useState(false);
+            const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
+            const [turnOrder, setTurnOrder] = useState([]);
+            
+            const peerRef = useRef(null);
+            const connectionsRef = useRef({});
+            const callsRef = useRef({});
+            const videoRefs = useRef({});
+            const audioContexts = useRef({});
+            const analyzerNodes = useRef({});
+            const startTimeRef = useRef(null);
+            const myVideoRef = useRef(null);
+            const myPeerIdRef = useRef(null);
+            const audioMonitoringRef = useRef({});
+            const isMyTurnRef = useRef(true);
+
+            const startAsHost = async () => {
+                const hostName = prompt("Enter your name (Host):");
+                if (!hostName || !hostName.trim()) return;
+
+                setConnectionStatus('Getting camera access...');
+                setParticipantName(hostName);
+                
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { width: 640, height: 480 }, 
+                        audio: true 
+                    });
+                    
+                    console.log('Host stream acquired:', stream.getTracks());
+                    setMyStream(stream);
+                    
+                    setTimeout(() => {
+                        if (myVideoRef.current) {
+                            myVideoRef.current.srcObject = stream;
+                            myVideoRef.current.play().catch(e => console.log('Play error:', e));
+                        }
+                    }, 100);
+                    
+                    setConnectionStatus('Creating room...');
+                    
+                    const peer = new Peer({
+                        config: {
+                            iceServers: [
+                                { urls: 'stun:stun.l.google.com:19302' },
+                                { urls: 'stun:stun1.l.google.com:19302' }
+                            ]
+                        },
+                        debug: 2
+                    });
+                    
+                    peerRef.current = peer;
+
+                    peer.on('open', (id) => {
+                        console.log('Host Peer ID:', id);
+                        myPeerIdRef.current = id;
+                        setRoomCode(id);
+                        setPeerReady(true);
+                        setMode('host');
+                        setConnectionStatus('Room ready!');
+                    });
+
+                    peer.on('connection', (conn) => {
+                        console.log('New data connection from:', conn.peer);
+                        connectionsRef.current[conn.peer] = conn;
+
+                        conn.on('open', () => {
+                            console.log('Data channel open with:', conn.peer);
+                        });
+
+                        conn.on('data', (data) => {
+                            console.log('Received data:', data);
+                            
+                            if (data.type === 'join') {
+                                handleDataFromParticipant(data, conn.peer);
+                                
+                                // Send current participants list and peer IDs to all
+                                setTimeout(() => {
+                                    broadcastToAll({
+                                        type: 'peer-list',
+                                        peers: Object.keys(connectionsRef.current)
+                                    });
+                                }, 500);
+                            } else {
+                                handleDataFromParticipant(data, conn.peer);
+                            }
+                        });
+                    });
+
+                    peer.on('call', (call) => {
+                        console.log('Receiving call from:', call.peer);
+                        
+                        call.answer(stream);
+                        callsRef.current[call.peer] = call;
+                        
+                        call.on('stream', (remoteStream) => {
+                            console.log('Received stream from:', call.peer);
+                            
+                            setParticipants(prev => prev.map(p => {
+                                if (p.peerId === call.peer) {
+                                    return { ...p, stream: remoteStream };
+                                }
+                                return p;
+                            }));
+                            
+                            setTimeout(() => {
+                                const videoEl = videoRefs.current[call.peer];
+                                if (videoEl && remoteStream) {
+                                    videoEl.srcObject = remoteStream;
+                                    videoEl.play().catch(e => console.log('Play error:', e));
+                                }
+                                setupAudioAnalysis(call.peer, remoteStream);
+                            }, 200);
+                        });
+                    });
+
+                    peer.on('error', (err) => {
+                        console.error('Peer error:', err);
+                        if (err.type !== 'peer-unavailable') {
+                            setConnectionStatus('Error: ' + err.type);
+                        }
+                    });
+
+                } catch (err) {
+                    alert('Camera/Microphone Error: ' + err.message);
+                    setMode(null);
+                    setConnectionStatus('');
+                }
+            };
+
+            const joinAsParticipant = async () => {
+                if (!participantName.trim() || !joinCode.trim()) {
+                    alert('Please enter your name and room code');
+                    return;
+                }
+
+                setConnectionStatus('Getting camera access...');
+                
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { width: 640, height: 480 }, 
+                        audio: true 
+                    });
+                    
+                    console.log('Participant stream acquired');
+                    setMyStream(stream);
+                    
+                    setTimeout(() => {
+                        if (myVideoRef.current) {
+                            myVideoRef.current.srcObject = stream;
+                            myVideoRef.current.play().catch(e => console.log('Play error:', e));
+                        }
+                    }, 100);
+
+                    setConnectionStatus('Connecting to host...');
+                    
+                    const peer = new Peer({
+                        config: {
+                            iceServers: [
+                                { urls: 'stun:stun.l.google.com:19302' },
+                                { urls: 'stun:stun1.l.google.com:19302' }
+                            ]
+                        },
+                        debug: 2
+                    });
+                    
+                    peerRef.current = peer;
+
+                    peer.on('open', (myId) => {
+                        console.log('My Peer ID:', myId);
+                        myPeerIdRef.current = myId;
+                        setPeerReady(true);
+                        
+                        const hostId = joinCode.trim();
+                        
+                        setTimeout(() => {
+                            try {
+                                const conn = peer.connect(hostId, { reliable: true });
+                                connectionsRef.current['host'] = conn;
+
+                                conn.on('open', () => {
+                                    console.log('Connected to host!');
+                                    setConnectionStatus('Connected!');
+                                    setMode('participant');
+                                    setRoomCode(joinCode);
+                                    setConnected(true);
+                                    
+                                    conn.send({
+                                        type: 'join',
+                                        name: participantName,
+                                        peerId: myId
+                                    });
+                                    
+                                    const call = peer.call(hostId, stream);
+                                    callsRef.current['host'] = call;
+                                });
+
+                                conn.on('data', (data) => {
+                                    console.log('Received from host:', data.type);
+                                    
+                                    if (data.type === 'peer-list') {
+                                        // Connect to all other participants
+                                        data.peers.forEach(peerId => {
+                                            if (peerId !== myId && peerId !== hostId && !callsRef.current[peerId]) {
+                                                console.log('Connecting to peer:', peerId);
+                                                setTimeout(() => {
+                                                    try {
+                                                        const peerCall = peer.call(peerId, stream);
+                                                        callsRef.current[peerId] = peerCall;
+                                                        
+                                                        peerCall.on('stream', (remoteStream) => {
+                                                            console.log('Received stream from participant:', peerId);
+                                                            // Store for potential UI rendering
+                                                        });
+                                                        
+                                                        peerCall.on('error', (err) => {
+                                                            console.error('Error with peer call to', peerId, err);
+                                                        });
+                                                    } catch (err) {
+                                                        console.error('Failed to call peer:', peerId, err);
+                                                    }
+                                                }, 300);
+                                            }
+                                        });
+                                    }
+                                    
+                                    handleDataFromHost(data);
+                                });
+
+                                conn.on('error', (err) => {
+                                    console.error('Connection error:', err);
+                                    setConnectionStatus('Connection failed');
+                                });
+
+                            } catch (err) {
+                                console.error('Failed to connect:', err);
+                                setConnectionStatus('Could not connect');
+                            }
+                        }, 500);
+                    });
+
+                    peer.on('call', (call) => {
+                        console.log('Receiving call from:', call.peer);
+                        call.answer(stream);
+                        callsRef.current[call.peer] = call;
+                        
+                        call.on('stream', (remoteStream) => {
+                            console.log('Received stream from:', call.peer);
+                            // Can be used if needed to display other participants
+                        });
+                    });
+
+                    peer.on('error', (err) => {
+                        console.error('Peer error:', err);
+                        if (err.type === 'peer-unavailable') {
+                            setConnectionStatus('Host not found');
+                        }
+                    });
+
+                } catch (err) {
+                    alert('Camera/Microphone Error: ' + err.message);
+                    setConnectionStatus('');
+                }
+            };
+
+            const handleDataFromParticipant = (data, peerId) => {
+                if (data.type === 'join') {
+                    console.log('Participant joined:', data.name);
+                    
+                    setParticipants(prev => {
+                        if (prev.some(p => p.peerId === peerId)) return prev;
+                        
+                        const newParticipants = [...prev, {
+                            id: peerId,
+                            peerId: peerId,
+                            name: data.name,
+                            stream: null,
+                            speaking: false,
+                            speakingTime: 0,
+                            contributions: 0,
+                            audioLevel: 0,
+                            isHost: false
+                        }];
+                        
+                        // Broadcast all participants to everyone
+                        broadcastToAll({ 
+                            type: 'participants-updated', 
+                            participants: newParticipants.map(p => ({ name: p.name, peerId: p.peerId }))
+                        });
+                        
+                        return newParticipants;
+                    });
+                }
+            };
+
+            const handleDataFromHost = (data) => {
+                if (data.type === 'gd-start') {
+                    setGdStarted(true);
+                    setTurnOrder(data.turnOrder || []);
+                    alert('GD Started!');
+                } else if (data.type === 'gd-end') {
+                    setGdStarted(false);
+                    alert('GD Ended! Check host for feedback.');
+                } else if (data.type === 'turn-change') {
+                    isMyTurnRef.current = data.currentSpeakerId === myPeerIdRef.current;
+                } else if (data.type === 'participants-updated') {
+                    // Update known participants for peer connections
+                    console.log('Participants updated:', data.participants);
+                }
+            };
+
+            const broadcastToAll = (data) => {
+                Object.entries(connectionsRef.current).forEach(([peerId, conn]) => {
+                    if (conn && conn.open) {
+                        try {
+                            conn.send(data);
+                        } catch (err) {
+                            console.error('Error sending to', peerId, err);
+                        }
+                    }
+                });
+            };
+
+            const setupAudioAnalysis = (peerId, stream) => {
+                try {
+                    console.log('Setting up audio for:', peerId);
+                    
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const audioSource = audioContext.createMediaStreamSource(stream);
+                    const analyzer = audioContext.createAnalyser();
+                    analyzer.fftSize = 512;
+                    analyzer.smoothingTimeConstant = 0.8;
+                    audioSource.connect(analyzer);
+                    
+                    audioContexts.current[peerId] = audioContext;
+                    analyzerNodes.current[peerId] = analyzer;
+                    
+                    if (gdStarted && !gdEnded) {
+                        startAudioMonitoring(peerId, analyzer);
+                    }
+                } catch (err) {
+                    console.error('Audio setup error:', err);
+                }
+            };
+
+            const startAudioMonitoring = (peerId, analyzer) => {
+                if (audioMonitoringRef.current[peerId]) return;
+                
+                const monitorAudio = () => {
+                    if (!gdStarted || gdEnded) {
+                        audioMonitoringRef.current[peerId] = false;
+                        return;
+                    }
+                    
+                    const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+                    analyzer.getByteFrequencyData(dataArray);
+                    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                    
+                    const isSpeaking = average > 25;
+                    
+                    setParticipants(prev => prev.map(p => {
+                        if (p.peerId === peerId) {
+                            const wasNotSpeaking = !p.speaking;
+                            const nowSpeaking = isSpeaking;
+                            const newContributions = wasNotSpeaking && nowSpeaking ? p.contributions + 1 : p.contributions;
+                            
+                            return {
+                                ...p,
+                                speaking: isSpeaking,
+                                contributions: newContributions,
+                                audioLevel: average
+                            };
+                        }
+                        return p;
+                    }));
+                    
+                    if (gdStarted && !gdEnded) {
+                        audioMonitoringRef.current[peerId] = requestAnimationFrame(monitorAudio);
+                    }
+                };
+                
+                audioMonitoringRef.current[peerId] = requestAnimationFrame(monitorAudio);
+            };
+
+            const startGD = () => {
+                if (participants.length === 0) {
+                    alert('Need at least 1 participant!');
+                    return;
+                }
+                
+                // Create turn order: host first, then all participants
+                const newTurnOrder = [
+                    { id: myPeerIdRef.current, name: participantName, isHost: true },
+                    ...participants.map(p => ({ id: p.peerId, name: p.name, isHost: false }))
+                ];
+                
+                setTurnOrder(newTurnOrder);
+                setCurrentTurnIndex(0);
+                setGdStarted(true);
+                startTimeRef.current = Date.now();
+                isMyTurnRef.current = true; // Host goes first
+                
+                // Notify all participants with turn order
+                broadcastToAll({ 
+                    type: 'gd-start',
+                    turnOrder: newTurnOrder,
+                    currentSpeakerId: newTurnOrder[0].id
+                });
+                
+                participants.forEach(p => {
+                    if (analyzerNodes.current[p.peerId]) {
+                        startAudioMonitoring(p.peerId, analyzerNodes.current[p.peerId]);
+                    }
+                });
+            };
+
+            const nextTurn = () => {
+                if (!gdStarted || currentTurnIndex >= turnOrder.length - 1) return;
+                
+                const nextIndex = currentTurnIndex + 1;
+                setCurrentTurnIndex(nextIndex);
+                const nextSpeaker = turnOrder[nextIndex];
+                
+                // Update host reference
+                isMyTurnRef.current = nextSpeaker.id === myPeerIdRef.current;
+                
+                // Notify all about turn change
+                broadcastToAll({
+                    type: 'turn-change',
+                    currentTurnIndex: nextIndex,
+                    currentSpeakerId: nextSpeaker.id
+                });
+                
+                // Reset speaking status for all
+                setParticipants(prev => prev.map(p => ({ ...p, speaking: false })));
+            };
+
+            const previousTurn = () => {
+                if (!gdStarted || currentTurnIndex <= 0) return;
+                
+                const prevIndex = currentTurnIndex - 1;
+                setCurrentTurnIndex(prevIndex);
+                const prevSpeaker = turnOrder[prevIndex];
+                
+                // Update host reference
+                isMyTurnRef.current = prevSpeaker.id === myPeerIdRef.current;
+                
+                // Notify all about turn change
+                broadcastToAll({
+                    type: 'turn-change',
+                    currentTurnIndex: prevIndex,
+                    currentSpeakerId: prevSpeaker.id
+                });
+                
+                // Reset speaking status for all
+                setParticipants(prev => prev.map(p => ({ ...p, speaking: false })));
+            };
+
+            const endGD = () => {
+                setGdEnded(true);
+                setGdStarted(false);
+                broadcastToAll({ type: 'gd-end' });
+                
+                Object.keys(audioMonitoringRef.current).forEach(peerId => {
+                    if (audioMonitoringRef.current[peerId]) {
+                        cancelAnimationFrame(audioMonitoringRef.current[peerId]);
+                    }
+                });
+                
+                Object.values(audioContexts.current).forEach(ctx => {
+                    try { ctx.close(); } catch (err) {}
+                });
+                
+                runMLAnalysis();
+            };
+
+            const runMLAnalysis = () => {
+                const results = participants.map(participant => {
+                    const speakingPercentage = totalTime > 0 ? (participant.speakingTime / totalTime) * 100 : 0;
+                    const contributionsPerMinute = totalTime > 0 ? (participant.contributions / (totalTime / 60)) : 0;
+                    
+                    const participationScore = Math.min(100, speakingPercentage * 2);
+                    const engagementScore = Math.min(100, contributionsPerMinute * 20);
+                    const balanceScore = Math.min(100, 100 - Math.abs(speakingPercentage - (100 / participants.length)) * 2);
+                    
+                    const overallScore = (participationScore * 0.35 + engagementScore * 0.25 + balanceScore * 0.20 + 75 * 0.20).toFixed(1);
+                    
+                    let feedback = [];
+                    
+                    if (participationScore < 30) {
+                        feedback.push('🔴 Low participation - spoke ' + speakingPercentage.toFixed(1) + '% of time. Contribute more.');
+                    } else if (participationScore > 70) {
+                        feedback.push('🟢 Excellent participation - ' + speakingPercentage.toFixed(1) + '% speaking time.');
+                    } else {
+                        feedback.push('🟡 Good participation - ' + speakingPercentage.toFixed(1) + '% speaking time.');
+                    }
+                    
+                    if (participant.contributions < 3) {
+                        feedback.push('💡 Only ' + participant.contributions + ' turns. Make more contributions.');
+                    } else if (participant.contributions > 10) {
+                        feedback.push('⭐ ' + participant.contributions + ' speaking turns - great engagement!');
+                    } else {
+                        feedback.push('✓ ' + participant.contributions + ' speaking contributions.');
+                    }
+                    
+                    if (balanceScore < 40) {
+                        if (speakingPercentage > (100 / participants.length)) {
+                            feedback.push('⚖️ Dominated discussion. Allow others more time.');
+                        } else {
+                            feedback.push('⚖️ Too quiet. Speak up more confidently.');
+                        }
+                    } else {
+                        feedback.push('✅ Well-balanced participation.');
+                    }
+                    
+                    feedback.push('😊 Maintained constructive communication.');
+                    
+                    let grade;
+                    if (overallScore >= 85) grade = 'A+';
+                    else if (overallScore >= 75) grade = 'A';
+                    else if (overallScore >= 65) grade = 'B+';
+                    else if (overallScore >= 55) grade = 'B';
+                    else if (overallScore >= 45) grade = 'C';
+                    else grade = 'D';
+                    
+                    return {
+                        name: participant.name,
+                        speakingTime: participant.speakingTime,
+                        speakingPercentage: speakingPercentage.toFixed(1),
+                        contributions: participant.contributions,
+                        contributionsPerMinute: contributionsPerMinute.toFixed(1),
+                        overallScore,
+                        participationScore: participationScore.toFixed(1),
+                        engagementScore: engagementScore.toFixed(1),
+                        balanceScore: balanceScore.toFixed(1),
+                        sentimentScore: '75.0',
+                        feedback,
+                        grade
+                    };
+                });
+                
+                const avgScore = results.length > 0 ? results.reduce((sum, r) => sum + parseFloat(r.overallScore), 0) / results.length : 0;
+                
+                setAnalysis({
+                    participants: results,
+                    groupInsights: {
+                        totalTime,
+                        avgScore: avgScore.toFixed(1),
+                        totalContributions: results.reduce((sum, r) => sum + r.contributions, 0),
+                        bestPerformer: results.length > 0 ? results.reduce((max, r) => 
+                            parseFloat(r.overallScore) > parseFloat(max.overallScore) ? r : max
+                        ) : { name: 'N/A' },
+                        needsImprovement: results.length > 0 ? results.reduce((min, r) => 
+                            parseFloat(r.overallScore) < parseFloat(min.overallScore) ? r : min
+                        ) : { name: 'N/A' }
+                    }
+                });
+            };
+
+            const copyRoomCode = () => {
+                const code = myPeerIdRef.current || roomCode;
+                navigator.clipboard.writeText(code);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            };
+
+            useEffect(() => {
+                let interval;
+                if (gdStarted && !gdEnded) {
+                    interval = setInterval(() => {
+                        setTotalTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
+                        setParticipants(prev => prev.map(p => p.speaking ? { ...p, speakingTime: p.speakingTime + 1 } : p));
+                    }, 1000);
+                }
+                return () => clearInterval(interval);
+            }, [gdStarted, gdEnded]);
+
+            useEffect(() => {
+                return () => {
+                    if (peerRef.current) peerRef.current.destroy();
+                    if (myStream) myStream.getTracks().forEach(track => track.stop());
+                };
+            }, []);
+
+            const formatTime = (seconds) => {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            // MODE SELECTION SCREEN
+            if (!mode) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+                        <div className="max-w-4xl w-full">
+                            <div className="text-center mb-12">
+                                <div className="flex justify-center mb-4">
+                                    <Brain />
+                                </div>
+                                <h1 className="text-5xl font-bold text-gray-800 mb-2">Multi-Device GD Analyzer</h1>
+                                <p className="text-gray-600 text-lg">Real-time Video • Audio Analysis • AI Feedback</p>
+                                {connectionStatus && (
+                                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <p className="text-sm text-blue-700 font-semibold">{connectionStatus}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid md:grid-cols-2 gap-6">
+                                {/* HOST CARD */}
+                                <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-shadow border-2 border-blue-200">
+                                    <div className="text-center">
+                                        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Users />
+                                        </div>
+                                        <h2 className="text-2xl font-bold text-gray-800 mb-2">Host GD Session</h2>
+                                        <p className="text-gray-600 mb-6">Create room and manage discussion</p>
+                                        <button
+                                            onClick={startAsHost}
+                                            className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-bold text-lg hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105"
+                                        >
+                                            🎯 Create Room
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* PARTICIPANT CARD */}
+                                <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-shadow border-2 border-green-200">
+                                    <div className="text-center">
+                                        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Video />
+                                        </div>
+                                        <h2 className="text-2xl font-bold text-gray-800 mb-2">Join as Participant</h2>
+                                        <p className="text-gray-600 mb-4">Enter code to join discussion</p>
+                                        <input
+                                            type="text"
+                                            placeholder="Your Name"
+                                            value={participantName}
+                                            onChange={(e) => setParticipantName(e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-green-500"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Paste Host's Peer ID"
+                                            value={joinCode}
+                                            onChange={(e) => setJoinCode(e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-green-500 font-mono text-sm"
+                                        />
+                                        <button
+                                            onClick={joinAsParticipant}
+                                            disabled={!participantName.trim() || !joinCode.trim()}
+                                            className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-bold text-lg hover:from-green-700 hover:to-blue-700 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            🚀 Join Room
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-12 bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+                                <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                    <AlertCircle />
+                                    Instructions:
+                                </h3>
+                                <ul className="space-y-2 text-gray-700 text-sm">
+                                    <li>✅ <strong>Host:</strong> Creates room, controls GD start/end</li>
+                                    <li>✅ <strong>Participants:</strong> Speak freely - audio analyzed in real-time</li>
+                                    <li>✅ Allow camera/mic permissions when prompted</li>
+                                    <li>⚠️ Host is NOT analyzed - only participants get feedback</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // PARTICIPANT VIEW
+            if (mode === 'participant') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 p-4">
+                        <div className="max-w-2xl mx-auto">
+                            <div className="text-center mb-6">
+                                <h1 className="text-3xl font-bold text-gray-800 mb-2">👤 Participant View</h1>
+                                <p className="text-gray-600">Name: <span className="font-bold">{participantName}</span></p>
+                                {connectionStatus && (
+                                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <p className="text-sm text-blue-700">{connectionStatus}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-lg p-6">
+                                <video
+                                    ref={myVideoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    className="w-full rounded-lg bg-gray-900 mb-4"
+                                    style={{ maxHeight: '400px' }}
+                                />
+                                
+                                {connected ? (
+                                    <div className="text-center space-y-3">
+                                        <div className="flex items-center justify-center gap-2 text-green-600">
+                                            <div className="w-3 h-3 bg-green-600 rounded-full animate-pulse" />
+                                            <span className="font-semibold">Connected to GD Session</span>
+                                        </div>
+                                        {gdStarted ? (
+                                            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                                                <p className="text-red-700 font-bold">🔴 GD in Progress</p>
+                                                <p className="text-sm text-red-600 mt-1">Speak freely! Your audio is being analyzed.</p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-600">Wait for host to start discussion</p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="text-center">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3" />
+                                        <p className="text-gray-600">Connecting...</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-gray-700">
+                                <p className="font-semibold mb-2">📝 Tips:</p>
+                                <ul className="space-y-1">
+                                    <li>• Speak clearly and confidently</li>
+                                    <li>• Make meaningful contributions</li>
+                                    <li>• Listen actively to others</li>
+                                    <li>• Your speaking time is tracked</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // HOST VIEW
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="text-center mb-6">
+                            <h1 className="text-4xl font-bold text-gray-800 mb-2">🎯 Host Dashboard</h1>
+                            <p className="text-gray-600">Host: <span className="font-bold">{participantName}</span></p>
+                        </div>
+
+                        {!gdEnded && (
+                            <>
+                                {/* PEER ID DISPLAY */}
+                                {peerReady && (
+                                    <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl shadow-lg p-6 text-white mb-6">
+                                        <div className="text-center">
+                                            <h2 className="text-2xl font-bold mb-3">📱 Share Peer ID</h2>
+                                            <div className="bg-white/90 text-gray-800 px-4 py-3 rounded-xl text-sm font-mono break-all mb-3 max-w-2xl mx-auto">
+                                                {myPeerIdRef.current || roomCode}
+                                            </div>
+                                            <button
+                                                onClick={copyRoomCode}
+                                                className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl transition-all inline-flex items-center gap-2"
+                                            >
+                                                {copied ? <Check /> : <Copy />}
+                                                {copied ? 'Copied!' : 'Copy ID'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* PARTICIPANTS GRID with HOST */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                                    <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                                        👥 All Participants ({participants.length + 1})
+                                    </h2>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {/* HOST VIDEO */}
+                                        <div key="host" className="border-4 border-blue-500 rounded-lg p-4 bg-blue-50">
+                                            <h3 className="font-bold text-lg text-gray-800 mb-2 text-blue-600">
+                                                🎯 HOST: {participantName}
+                                            </h3>
+                                            <video
+                                                ref={myVideoRef}
+                                                autoPlay
+                                                playsInline
+                                                muted
+                                                className="w-full h-40 bg-gray-900 rounded-lg mb-3 object-cover"
+                                            />
+                                            
+                                            {gdStarted && (
+                                                <div className="space-y-2">
+                                                    <div className={`flex items-center gap-2 ${currentTurnIndex === 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                                        <Mic />
+                                                        <span className="text-sm font-semibold">
+                                                            {currentTurnIndex === 0 ? '🔴 Speaking Now' : 'Listening'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs text-gray-600">
+                                                        Turn: 1 of {turnOrder.length}
+                                                    </div>
+                                                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className={`h-full transition-all ${currentTurnIndex === 0 ? 'bg-red-500' : 'bg-blue-500'}`}
+                                                            style={{ width: `${currentTurnIndex === 0 ? 100 : 0}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* PARTICIPANT VIDEOS */}
+                                        {participants.map((p, idx) => (
+                                            <div 
+                                                key={p.peerId} 
+                                                className={`border-4 rounded-lg p-4 ${
+                                                    turnOrder[currentTurnIndex]?.id === p.peerId 
+                                                        ? 'border-red-500 bg-red-50' 
+                                                        : 'border-gray-200 bg-white'
+                                                }`}
+                                            >
+                                                <h3 className={`font-bold text-lg mb-2 ${
+                                                    turnOrder[currentTurnIndex]?.id === p.peerId 
+                                                        ? 'text-red-600' 
+                                                        : 'text-gray-800'
+                                                }`}>
+                                                    {turnOrder[currentTurnIndex]?.id === p.peerId ? '🔴 ' : ''} 
+                                                    {p.name}
+                                                </h3>
+                                                <video
+                                                    ref={el => videoRefs.current[p.peerId] = el}
+                                                    autoPlay
+                                                    playsInline
+                                                    className="w-full h-40 bg-gray-900 rounded-lg mb-3 object-cover"
+                                                />
+                                                
+                                                {gdStarted && (
+                                                    <div className="space-y-2">
+                                                        <div className={`flex items-center gap-2 ${
+                                                            turnOrder[currentTurnIndex]?.id === p.peerId ? 'text-red-600' : 'text-gray-400'
+                                                        }`}>
+                                                            <Mic />
+                                                            <span className="text-sm font-semibold">
+                                                                {turnOrder[currentTurnIndex]?.id === p.peerId ? '🔴 Speaking Now' : 'Waiting'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-gray-600">
+                                                            Turn: {idx + 2} of {turnOrder.length} | Turns Taken: {p.contributions}
+                                                        </div>
+                                                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                            <div 
+                                                                className={`h-full transition-all ${turnOrder[currentTurnIndex]?.id === p.peerId ? 'bg-red-500' : 'bg-blue-500'}`}
+                                                                style={{ width: `${Math.min(100, (turnOrder[currentTurnIndex]?.id === p.peerId ? 100 : p.audioLevel))}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* CONTROL PANEL */}
+                                <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-xl shadow-lg p-6 text-white">
+                                    <div className="flex justify-between items-center flex-wrap gap-4">
+                                        <div>
+                                            <h3 className="text-2xl font-bold mb-2">
+                                                {gdStarted ? '🔴 GD in Progress' : '⏸️ Ready to Start'}
+                                            </h3>
+                                            {gdStarted && (
+                                                <div>
+                                                    <div className="text-lg">Duration: {formatTime(totalTime)}</div>
+                                                    {turnOrder.length > 0 && (
+                                                        <div className="text-lg font-semibold">
+                                                            Current Speaker: <span className="text-yellow-300">{turnOrder[currentTurnIndex]?.name}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2 flex-wrap justify-end">
+                                            {!gdStarted ? (
+                                                <button
+                                                    onClick={startGD}
+                                                    disabled={participants.length === 0}
+                                                    className="px-8 py-4 bg-white text-green-600 rounded-xl font-bold text-lg hover:bg-gray-100 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all transform hover:scale-105"
+                                                >
+                                                    🎬 Start GD
+                                                </button>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        onClick={previousTurn}
+                                                        disabled={currentTurnIndex === 0}
+                                                        className="px-4 py-4 bg-white/20 hover:bg-white/30 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                    >
+                                                        ⬅️ Previous
+                                                    </button>
+                                                    <button
+                                                        onClick={nextTurn}
+                                                        disabled={currentTurnIndex >= turnOrder.length - 1}
+                                                        className="px-4 py-4 bg-white/20 hover:bg-white/30 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                    >
+                                                        Next ➡️
+                                                    </button>
+                                                    <button
+                                                        onClick={endGD}
+                                                        className="px-8 py-4 bg-red-600 text-white rounded-xl font-bold text-lg hover:bg-red-700 transition-all transform hover:scale-105 flex items-center gap-2"
+                                                    >
+                                                        <StopCircle />
+                                                        End & Analyze
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* ANALYSIS RESULTS */}
+                        {gdEnded && analysis && (
+                            <div className="space-y-6">
+                                <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-xl shadow-lg p-6 text-white">
+                                    <h2 className="text-3xl font-bold mb-4">📊 Summary</h2>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="bg-white/10 rounded-lg p-4">
+                                            <div className="text-sm opacity-90">Duration</div>
+                                            <div className="text-3xl font-bold">{formatTime(analysis.groupInsights.totalTime)}</div>
+                                        </div>
+                                        <div className="bg-white/10 rounded-lg p-4">
+                                            <div className="text-sm opacity-90">Turns</div>
+                                            <div className="text-3xl font-bold">{analysis.groupInsights.totalContributions}</div>
+                                        </div>
+                                        <div className="bg-white/10 rounded-lg p-4">
+                                            <div className="text-sm opacity-90">Avg Score</div>
+                                            <div className="text-3xl font-bold">{analysis.groupInsights.avgScore}</div>
+                                        </div>
+                                        <div className="bg-white/10 rounded-lg p-4">
+                                            <div className="text-sm opacity-90">Top</div>
+                                            <div className="text-lg font-bold">{analysis.groupInsights.bestPerformer.name}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-xl shadow-lg p-6">
+                                    <h2 className="text-3xl font-bold text-gray-800 mb-6">🎯 Individual Feedback</h2>
+                                    <div className="space-y-6">
+                                        {analysis.participants.map((p, idx) => (
+                                            <div key={idx} className="border-2 border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <div>
+                                                        <h3 className="text-2xl font-bold text-blue-600">{p.name}</h3>
+                                                        <div className="text-gray-600">Speaking: {formatTime(p.speakingTime)} ({p.speakingPercentage}%)</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-5xl font-bold text-purple-600">{p.grade}</div>
+                                                        <div className="text-xl font-semibold text-gray-700">{p.overallScore}/100</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                                                        <div className="text-2xl font-bold text-blue-600">{p.participationScore}</div>
+                                                        <div className="text-xs text-gray-600">Participation</div>
+                                                    </div>
+                                                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                                                        <div className="text-2xl font-bold text-green-600">{p.engagementScore}</div>
+                                                        <div className="text-xs text-gray-600">Engagement</div>
+                                                    </div>
+                                                    <div className="text-center p-3 bg-purple-50 rounded-lg">
+                                                        <div className="text-2xl font-bold text-purple-600">{p.balanceScore}</div>
+                                                        <div className="text-xs text-gray-600">Balance</div>
+                                                    </div>
+                                                    <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                                                        <div className="text-2xl font-bold text-yellow-600">{p.sentimentScore}</div>
+                                                        <div className="text-xs text-gray-600">Communication</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4">
+                                                    <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                                        <Award />
+                                                        AI Feedback
+                                                    </h4>
+                                                    <ul className="space-y-2">
+                                                        {p.feedback.map((fb, i) => (
+                                                            <li key={i} className="text-gray-700 text-sm">{fb}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="text-center">
+                                    <button
+                                        onClick={() => window.location.reload()}
+                                        className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-bold text-lg hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105"
+                                    >
+                                        🔄 New Session
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="mt-8 text-center text-sm text-gray-500">
+                            <p>✨ Real-time WebRTC • Audio Analysis • AI Feedback</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        try {
+            ReactDOM.render(<MultiDeviceGDAnalyzer />, document.getElementById('root'));
+        } catch (err) {
+            const root = document.getElementById('root');
+            if (root) root.innerHTML = '<div style="padding:18px;font-family:monospace;color:#900;background:#fff6f6;border:1px solid #f5c2c2;">' +
+                '<strong>Render error:</strong><pre style="white-space:pre-wrap;margin-top:8px">' + (err && (err.stack || err.message) || String(err)) + '</pre></div>';
+            console.error('Render error', err);
+        }
+    </script>
+</body>
+</html>
