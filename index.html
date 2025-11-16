@@ -153,39 +153,27 @@
                         }
                     }, 100);
                     
-                    setConnectionStatus('Creating room... (Step 1/3: Initializing)');
+                    setConnectionStatus('Creating room...');
                     
                     const peer = new Peer({
-                        host: 'localhost',
-                        port: 9000,
-                        path: '/peerjs',
                         config: {
                             iceServers: [
                                 { urls: 'stun:stun.l.google.com:19302' },
                                 { urls: 'stun:stun1.l.google.com:19302' }
                             ]
                         },
-                        debug: 0,
-                        logFunction: () => {} // Suppress logs for speed
+                        debug: 2
                     });
-                    
-                    // Set timeout for room creation
-                    const roomTimeoutId = setTimeout(() => {
-                        if (!peerRef.current) {
-                            setConnectionStatus('⚠️ Room creation taking longer than expected. Please wait...');
-                        }
-                    }, 5000);
                     
                     peerRef.current = peer;
 
                     peer.on('open', (id) => {
-                        clearTimeout(roomTimeoutId);
                         console.log('Host Peer ID:', id);
                         myPeerIdRef.current = id;
                         setRoomCode(id);
                         setPeerReady(true);
                         setMode('host');
-                        setConnectionStatus('✅ Room ready!');
+                        setConnectionStatus('✅ Room ready! Share your Peer ID with participants.');
                     });
 
                     peer.on('connection', (conn) => {
@@ -202,7 +190,6 @@
                             if (data.type === 'join') {
                                 handleDataFromParticipant(data, conn.peer);
                                 
-                                // Send current participants list and peer IDs to all
                                 setTimeout(() => {
                                     broadcastToAll({
                                         type: 'peer-list',
@@ -280,20 +267,16 @@
                         }
                     }, 100);
 
-                    setConnectionStatus('Connecting to host... (Step 1/3: Initializing)');
+                    setConnectionStatus('Connecting to host...');
                     
                     const peer = new Peer({
-                        host: 'localhost',
-                        port: 9000,
-                        path: '/peerjs',
                         config: {
                             iceServers: [
                                 { urls: 'stun:stun.l.google.com:19302' },
                                 { urls: 'stun:stun1.l.google.com:19302' }
                             ]
                         },
-                        debug: 0,
-                        logFunction: () => {} // Suppress logs for speed
+                        debug: 2
                     });
                     
                     peerRef.current = peer;
@@ -302,13 +285,12 @@
                         console.log('My Peer ID:', myId);
                         myPeerIdRef.current = myId;
                         setPeerReady(true);
-                        setConnectionStatus('Connecting to host... (Step 2/3: Reaching server)');
+                        setConnectionStatus('Establishing connection...');
                         
                         const hostId = joinCode.trim();
                         
                         setTimeout(() => {
                             try {
-                                setConnectionStatus('Connecting to host... (Step 3/3: Establishing connection)');
                                 const conn = peer.connect(hostId, { reliable: true });
                                 connectionsRef.current['host'] = conn;
 
@@ -338,7 +320,6 @@
                                     console.log('Received from host:', data.type);
                                     
                                     if (data.type === 'peer-list') {
-                                        // Connect to all other participants
                                         data.peers.forEach(peerId => {
                                             if (peerId !== myId && peerId !== hostId && !callsRef.current[peerId]) {
                                                 console.log('Connecting to peer:', peerId);
@@ -349,7 +330,6 @@
                                                         
                                                         peerCall.on('stream', (remoteStream) => {
                                                             console.log('Received stream from participant:', peerId);
-                                                            // Store for potential UI rendering
                                                         });
                                                         
                                                         peerCall.on('error', (err) => {
@@ -385,14 +365,13 @@
                         
                         call.on('stream', (remoteStream) => {
                             console.log('Received stream from:', call.peer);
-                            // Can be used if needed to display other participants
                         });
                     });
 
                     peer.on('error', (err) => {
                         console.error('Peer error:', err);
                         if (err.type === 'peer-unavailable') {
-                            setConnectionStatus('Host not found');
+                            setConnectionStatus('❌ Host not found. Check the Peer ID.');
                         }
                     });
 
@@ -421,7 +400,6 @@
                             isHost: false
                         }];
                         
-                        // Broadcast all participants to everyone
                         broadcastToAll({ 
                             type: 'participants-updated', 
                             participants: newParticipants.map(p => ({ name: p.name, peerId: p.peerId }))
@@ -443,7 +421,6 @@
                 } else if (data.type === 'turn-change') {
                     isMyTurnRef.current = data.currentSpeakerId === myPeerIdRef.current;
                 } else if (data.type === 'participants-updated') {
-                    // Update known participants for peer connections
                     console.log('Participants updated:', data.participants);
                 }
             };
@@ -527,7 +504,6 @@
                     return;
                 }
                 
-                // Create turn order: host first, then all participants
                 const newTurnOrder = [
                     { id: myPeerIdRef.current, name: participantName, isHost: true },
                     ...participants.map(p => ({ id: p.peerId, name: p.name, isHost: false }))
@@ -537,9 +513,8 @@
                 setCurrentTurnIndex(0);
                 setGdStarted(true);
                 startTimeRef.current = Date.now();
-                isMyTurnRef.current = true; // Host goes first
+                isMyTurnRef.current = true;
                 
-                // Notify all participants with turn order
                 broadcastToAll({ 
                     type: 'gd-start',
                     turnOrder: newTurnOrder,
@@ -560,17 +535,14 @@
                 setCurrentTurnIndex(nextIndex);
                 const nextSpeaker = turnOrder[nextIndex];
                 
-                // Update host reference
                 isMyTurnRef.current = nextSpeaker.id === myPeerIdRef.current;
                 
-                // Notify all about turn change
                 broadcastToAll({
                     type: 'turn-change',
                     currentTurnIndex: nextIndex,
                     currentSpeakerId: nextSpeaker.id
                 });
                 
-                // Reset speaking status for all
                 setParticipants(prev => prev.map(p => ({ ...p, speaking: false })));
             };
 
@@ -581,17 +553,14 @@
                 setCurrentTurnIndex(prevIndex);
                 const prevSpeaker = turnOrder[prevIndex];
                 
-                // Update host reference
                 isMyTurnRef.current = prevSpeaker.id === myPeerIdRef.current;
                 
-                // Notify all about turn change
                 broadcastToAll({
                     type: 'turn-change',
                     currentTurnIndex: prevIndex,
                     currentSpeakerId: prevSpeaker.id
                 });
                 
-                // Reset speaking status for all
                 setParticipants(prev => prev.map(p => ({ ...p, speaking: false })));
             };
 
@@ -746,7 +715,6 @@
                             </div>
 
                             <div className="grid md:grid-cols-2 gap-6">
-                                {/* HOST CARD */}
                                 <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-shadow border-2 border-blue-200">
                                     <div className="text-center">
                                         <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -763,7 +731,6 @@
                                     </div>
                                 </div>
 
-                                {/* PARTICIPANT CARD */}
                                 <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-shadow border-2 border-green-200">
                                     <div className="text-center">
                                         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -886,7 +853,6 @@
 
                         {!gdEnded && (
                             <>
-                                {/* PEER ID DISPLAY */}
                                 {peerReady && (
                                     <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl shadow-lg p-6 text-white mb-6">
                                         <div className="text-center">
@@ -905,14 +871,12 @@
                                     </div>
                                 )}
 
-                                {/* PARTICIPANTS GRID with HOST */}
                                 <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
                                     <h2 className="text-2xl font-bold text-gray-800 mb-4">
                                         👥 All Participants ({participants.length + 1})
                                     </h2>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {/* HOST VIDEO */}
                                         <div key="host" className="border-4 border-blue-500 rounded-lg p-4 bg-blue-50">
                                             <h3 className="font-bold text-lg text-gray-800 mb-2 text-blue-600">
                                                 🎯 HOST: {participantName}
@@ -946,7 +910,6 @@
                                             )}
                                         </div>
 
-                                        {/* PARTICIPANT VIDEOS */}
                                         {participants.map((p, idx) => (
                                             <div 
                                                 key={p.peerId} 
@@ -997,7 +960,6 @@
                                     </div>
                                 </div>
 
-                                {/* CONTROL PANEL */}
                                 <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-xl shadow-lg p-6 text-white">
                                     <div className="flex justify-between items-center flex-wrap gap-4">
                                         <div>
@@ -1055,7 +1017,6 @@
                             </>
                         )}
 
-                        {/* ANALYSIS RESULTS */}
                         {gdEnded && analysis && (
                             <div className="space-y-6">
                                 <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-xl shadow-lg p-6 text-white">
